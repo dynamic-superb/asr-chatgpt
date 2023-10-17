@@ -75,6 +75,14 @@ def log(dataset_name, results, output_log_path):
     print(f"Write log and save in {output_log_path}/{dataset_name.split('/')[1]}.json")
 
 
+def get_instance(instance_path):
+
+    with open(instance_path, "r") as fp:
+        instance_data = json.load(fp)
+    
+    return instance_data
+
+
 def main(args):
 
     ''' Handle data path. '''
@@ -87,17 +95,27 @@ def main(args):
     model = WhisperForConditionalGeneration.from_pretrained(args.whisper).to(args.device)
     model.config.forced_decoder_ids = None
 
-    for dataset_name in tqdm(args.dataset):
+    for instance in tqdm(args.instance):
+
+        ''' Get instance data of the task. '''
+        instance_data = get_instance(instance_path=instance)
+
+        ''' Get the name of dataset in hugging face. '''
+        dataset_name_hf = instance_data["path"]
+
+        ''' Remove the prefix of Dynamic-SUPERB. '''
+        dataset_name = instance_data["name"]
+
         print(f"Download {dataset_name}")
 
-        # Download dataset to disk
+        ''' Check and download dataset to disk. '''
         if (dataset_path/dataset_name).exists():
             print("Dataset Exists")
             dataset = load_from_disk(dataset_path/dataset_name)
             print("Dataset loaded")
         else:
 
-            dataset = load_dataset(f"DynamicSuperb/{dataset_name}", cache_dir=dataset_path)
+            dataset = load_dataset(dataset_name_hf, cache_dir=dataset_path)
             (dataset_path/dataset_name).mkdir(parents=True, exist_ok=True)
             dataset.save_to_disk(dataset_path/dataset_name)    
         
@@ -157,11 +175,11 @@ def parse_args() -> Namespace:
     parser.add_argument("--token", type=str, help="Your OpenAI API key.")
     parser.add_argument("--whisper", type=str, default="openai/whisper-large-v2", help="Which Whisper do you want to utilize.")
     parser.add_argument("--chatgpt", type=str, default="gpt-3.5-turbo", help="Which ChatGPT do you want to utilize.")
-    parser.add_argument("--dataset", type=str, default=["AccentClassification_AccentdbExtended", "BirdSoundDetection_Warblrb10k"])
-    parser.add_argument("--dataset_path", type=str, default="./dynamic-superb-dataset")
-    parser.add_argument("--transcript_path", type=str, default="./whisper_transcript")
-    parser.add_argument("--response_path", type=str, default="./chatgpt_response")
-    parser.add_argument("--log_path", type=str, default="./log")
+    parser.add_argument("--instance", type=list, default=["./AccentClassification/AccentClassification_AccentdbExtended/instance.json"], help="instance.json of tasks.")
+    parser.add_argument("--dataset_path", type=str, default="./dynamic-superb-dataset", help="where to save dataset.")
+    parser.add_argument("--transcript_path", type=str, default="./whisper_transcript", help="where to save transcript.")
+    parser.add_argument("--response_path", type=str, default="./chatgpt_response", help="where to save chatgpt response.")
+    parser.add_argument("--log_path", type=str, default="./log", help="where to save log.")
     parser.add_argument("--device", type=str, default="cuda")
 
     args = parser.parse_args()    
